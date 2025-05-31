@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:13.3-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: "lab2"
+      POSTGRES_USER: "stdneprov"
+      POSTGRES_PASSWORD: "password"
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - ./postgres/binary/dbdata:/var/lib/postgresql/data
+      - ./postgres/binary/dbroot:/root
+      - ./postgres/csv:/csv
+      - ./postgres/init-scripts:/docker-entrypoint-initdb.d
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "8123:8123"  # HTTP interface
+      - "9000:9000"  # Native client interface
+      - "9009:9009"  # Interserver communication
+    volumes:
+      - ./clickhouse/binary/clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse/init-scripts:/docker-entrypoint-initdb.d
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    environment:
+      - CLICKHOUSE_USER=stdneprov
+      - CLICKHOUSE_PASSWORD=password
+
+  spark-master:
+    image: bitnami/spark:3.5.5
+    environment:
+      JDK_JAVA_OPTIONS: --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+      SPARK_MODE: master
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+      - "4040:4040"
+    volumes:
+      - "./spark-logs:/spark/logs"
+
+  spark-worker:
+    image: bitnami/spark:3.5.5
+    depends_on:
+      - spark-master
+    environment:
+      JDK_JAVA_OPTIONS: --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+    volumes:
+      - "./spark-logs:/spark/logs"
+  
+  mongodb:
+    image: mongo:latest
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: stdneprov
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: admin
+    volumes:
+      - ./mongodb/binary/data:/data/db
+      - ./mongodb/binary/config:/data/configdb
+      - ./mongodb/init-scripts:/docker-entrypoint-initdb.d
+  
